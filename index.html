@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ShadowStride: Ninja Velocity (Demo)</title>
+    <title>Skybound Sprint</title>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
     <style>
         body {
@@ -16,7 +16,7 @@
             height: 100vh;
         }
         canvas {
-            border: 2px solid #e74c3c;
+            border: 2px solid #00bfff;
             border-radius: 5px;
         }
     </style>
@@ -43,13 +43,14 @@
         };
 
         const game = new Phaser.Game(config);
-        let player, cursors, platforms, obstacles, score = 0, scoreText;
+        let player, cursors, platforms, obstacles, finishLine, score = 0, scoreText, canDoubleJump = false;
 
         function preload() {
-            this.load.image('background', 'https://via.placeholder.com/800x400?text=Skyline');
+            this.load.image('background', 'https://via.placeholder.com/800x400?text=Aeropolis+Sky');
             this.load.image('ground', 'https://via.placeholder.com/200x50?text=Platform');
-            this.load.image('player', 'https://via.placeholder.com/50x50?text=Ninja');
-            this.load.image('obstacle', 'https://via.placeholder.com/30x30?text=Drone');
+            this.load.image('player', 'https://via.placeholder.com/40x40?text=Aero');
+            this.load.image('obstacle', 'https://via.placeholder.com/50x50?text=Obstacle');
+            this.load.image('finish', 'https://via.placeholder.com/50x50?text=Finish');
         }
 
         function create() {
@@ -59,29 +60,34 @@
             // Platforms
             platforms = this.physics.add.staticGroup();
             platforms.create(400, 380, 'ground').setScale(2).refreshBody();
+            platforms.create(600, 300, 'ground');
+            platforms.create(200, 250, 'ground');
 
-            // Player (Kage)
-            player = this.physics.add.sprite(100, 300, 'player');
+            // Player (Aero)
+            player = this.physics.add.sprite(50, 340, 'player');
             player.setBounce(0.2);
             player.setCollideWorldBounds(true);
             player.body.setGravityY(300);
 
-            // Obstacles (Drones)
+            // Obstacles
             obstacles = this.physics.add.group({
                 key: 'obstacle',
-                repeat: 2,
-                setXY: { x: 600, y: 300, stepX: 200 }
+                repeat: 3,
+                setXY: { x: 450, y: 330, stepX: 150 }
             });
             obstacles.children.iterate(function (child) {
-                child.setBounce(1);
-                child.setCollideWorldBounds(true);
-                child.setVelocityX(-200);
+                child.setImmovable(true);
             });
+
+            // Finish Line
+            finishLine = this.physics.add.sprite(750, 330, 'finish');
+            finishLine.setImmovable(true);
 
             // Collisions
             this.physics.add.collider(player, platforms);
             this.physics.add.collider(obstacles, platforms);
-            this.physics.add.overlap(player, obstacles, hitObstacle, null, this);
+            this.physics.add.collider(player, obstacles);
+            this.physics.add.overlap(player, finishLine, reachFinish, null, this);
 
             // Camera
             this.cameras.main.setBounds(0, 0, 800, 400);
@@ -90,8 +96,8 @@
             // Controls
             cursors = this.input.keyboard.createCursorKeys();
 
-            // Score
-            scoreText = this.add.text(16, 16, 'Score: 0', { fontSize: '20px', fill: '#fff', fontFamily: 'Arial' });
+            // Score/Time
+            scoreText = this.add.text(16, 16, 'Time: 0', { fontSize: '20px', fill: '#fff', fontFamily: 'Arial' });
             scoreText.setScrollFactor(0);
         }
 
@@ -104,25 +110,36 @@
                 player.setVelocityX(0);
             }
 
-            if (cursors.up.isDown && player.body.touching.down) {
+            if (cursors.up.isDown && (player.body.touching.down || canDoubleJump)) {
                 player.setVelocityY(-330);
+                if (player.body.touching.down) {
+                    canDoubleJump = true;
+                } else {
+                    canDoubleJump = false;
+                }
             }
 
-            // Keep obstacles moving
-            obstacles.children.iterate(function (child) {
-                if (child.x < -30) {
-                    child.x = 830;
-                    child.setVelocityX(Phaser.Math.Between(-200, -150));
-                }
-            });
+            // Update time/score
+            score += 0.016; // Approx. 60 FPS, increment every frame
+            scoreText.setText('Time: ' + Math.floor(score));
+
+            // Keep player in bounds vertically
+            if (player.y > 400) {
+                player.y = 400;
+                player.setVelocityY(0);
+            }
         }
 
-        function hitObstacle(player, obstacle) {
+        function reachFinish(player, finish) {
             this.physics.pause();
-            player.setTint(0xff0000);
-            player.anims.play('turn');
-            scoreText.setText('Game Over! Score: ' + score);
-            gameOver = true;
+            scoreText.setText('Finished! Time: ' + Math.floor(score) + 's');
+            this.add.text(400, 200, 'Press R to Restart', { fontSize: '24px', fill: '#fff', fontFamily: 'Arial' })
+                .setOrigin(0.5);
+
+            // Restart on 'R' key
+            this.input.keyboard.on('keydown-R', () => {
+                this.scene.restart();
+            });
         }
     </script>
     <div id="game-container"></div>
